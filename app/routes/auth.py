@@ -1,7 +1,6 @@
 """
 Auth routes — proxy sign-up/login/logout to Supabase GoTrue.
-The frontend uses Supabase JS client directly for auth, but these
-endpoints provide a backend alternative + profile management.
+Calls GoTrue directly (not through Kong) to avoid API key issues.
 """
 
 from __future__ import annotations
@@ -21,6 +20,9 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 TIMEOUT = httpx.Timeout(10.0)
 
+# GoTrue is called directly — not through Kong — to avoid apikey issues
+GOTRUE_URL = "http://supabase-auth:9999"
+
 
 @router.post("/signup")
 async def signup(
@@ -31,14 +33,13 @@ async def signup(
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             resp = await client.post(
-                f"{settings.supabase_url}/auth/v1/signup",
+                f"{GOTRUE_URL}/signup",
                 json={
                     "email": body.email,
                     "password": body.password,
                     "data": {"display_name": body.display_name or body.email.split("@")[0]},
                 },
                 headers={
-                    "apikey": settings.anon_key,
                     "Content-Type": "application/json",
                 },
             )
@@ -70,13 +71,12 @@ async def login(
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             resp = await client.post(
-                f"{settings.supabase_url}/auth/v1/token?grant_type=password",
+                f"{GOTRUE_URL}/token?grant_type=password",
                 json={
                     "email": body.email,
                     "password": body.password,
                 },
                 headers={
-                    "apikey": settings.anon_key,
                     "Content-Type": "application/json",
                 },
             )
@@ -109,10 +109,9 @@ async def refresh_token(
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             resp = await client.post(
-                f"{settings.supabase_url}/auth/v1/token?grant_type=refresh_token",
+                f"{GOTRUE_URL}/token?grant_type=refresh_token",
                 json={"refresh_token": refresh_token},
                 headers={
-                    "apikey": settings.anon_key,
                     "Content-Type": "application/json",
                 },
             )
