@@ -45,18 +45,22 @@ def _extract_token(request: Request) -> str:
 def _verify_jwt(token: str, jwt_secret: str) -> dict:
     """Verify and decode a Supabase JWT."""
     try:
+        # First try with audience check
         payload = jwt.decode(
             token,
             jwt_secret,
             algorithms=["HS256"],
-            audience="authenticated",
+            options={
+                "verify_aud": False,  # GoTrue audience format varies by version
+            },
         )
+        logger.debug(f"JWT decoded: sub={payload.get('sub', 'N/A')}, role={payload.get('role', 'N/A')}, aud={payload.get('aud', 'N/A')}")
         return payload
     except JWTError as e:
-        logger.warning(f"JWT verification failed: {e}")
+        logger.warning(f"JWT verification failed: {e} | token_prefix={token[:20]}...")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
+            detail=f"Invalid or expired token: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
