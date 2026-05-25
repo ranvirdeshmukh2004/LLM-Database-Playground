@@ -15,7 +15,7 @@ services:
   # PostgreSQL — Core database (Supabase-enhanced)
   # ────────────────────────────────────────────────────────────
   supabase-db:
-    image: supabase/postgres:15.8.1.060
+    image: supabase/postgres:15.6.1.146
     container_name: supabase-db
     restart: unless-stopped
     ports:
@@ -30,17 +30,18 @@ services:
       - ./db/migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     command:
       - postgres
       - -c
       - wal_level=logical
       - -c
-      - max_connections=200
+      - max_connections=100
       - -c
-      - shared_buffers=256MB
+      - shared_buffers=128MB
       - -c
       - work_mem=8MB
     networks:
@@ -50,7 +51,7 @@ services:
   # Supabase Auth (GoTrue) — User authentication
   # ────────────────────────────────────────────────────────────
   supabase-auth:
-    image: supabase/gotrue:v2.170.0
+    image: supabase/gotrue:v2.186.0
     container_name: supabase-auth
     restart: unless-stopped
     depends_on:
@@ -203,7 +204,7 @@ services:
   # Supabase Kong — API Gateway (routes /auth, /rest, etc.)
   # ────────────────────────────────────────────────────────────
   supabase-kong:
-    image: kong:2.8.1
+    image: kong/kong:3.9.1
     container_name: supabase-kong
     restart: unless-stopped
     depends_on:
@@ -212,10 +213,10 @@ services:
       supabase-rest:
         condition: service_started
     ports:
-      - "127.0.0.1:8000:8000"
+      - "8080:8000"
     environment:
       KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/kong.yml
       KONG_DNS_ORDER: LAST,A,CNAME
       KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
       KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
@@ -223,7 +224,7 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
     volumes:
-      - ./docker/kong.yml:/home/kong/kong.yml:ro
+      - ./docker/kong.yml:/usr/local/kong/kong.yml:ro
     networks:
       - app-network
 

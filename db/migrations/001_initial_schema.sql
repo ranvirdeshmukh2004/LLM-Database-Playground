@@ -1,21 +1,25 @@
 -- ═══════════════════════════════════════════════════════════════
--- MVP AI Agent Platform — PostgreSQL Schema (001)
--- Runs inside Supabase PostgreSQL (uses auth.users from GoTrue)
+-- MVP AI Agent Platform — PostgreSQL Init Schema (001)
+-- Runs via docker-entrypoint-initdb.d/ on FIRST DB startup.
 --
--- This file is auto-executed on first DB startup via:
---   docker-entrypoint-initdb.d/
+-- IMPORTANT: At init time, the 'auth' schema does NOT exist yet
+-- (GoTrue creates it when it first connects). So we CANNOT reference
+-- auth.users or auth.uid() here.
+--
+-- Tables use plain UUID columns for user_id.
+-- auth.users foreign keys + RLS policies are added in 002 (post-init).
 -- ═══════════════════════════════════════════════════════════════
 
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+
 -- ═══════════════════════════════════════════════════════════════
 -- 1. USER PROFILES
--- Extends Supabase auth.users with app-specific fields
 -- ═══════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.profiles (
-    id            UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    id            UUID PRIMARY KEY,
     display_name  TEXT,
     avatar_url    TEXT,
     preferences   JSONB DEFAULT '{}',
@@ -23,26 +27,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
-COMMENT ON TABLE public.profiles IS 'Extended user profile data, linked 1:1 with auth.users';
-
--- Auto-create profile on signup
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO public.profiles (id, display_name)
-    VALUES (
-        NEW.id,
-        COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1))
-    );
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Drop trigger if exists (idempotent)
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-    AFTER INSERT ON auth.users
-    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+COMMENT ON TABLE public.profiles IS 'Extended user profile data, linked 1:1 with auth.users (FK added post-init)';
 
 
 -- ═══════════════════════════════════════════════════════════════
@@ -50,7 +35,7 @@ CREATE TRIGGER on_auth_user_created
 -- ═══════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.api_keys (
     id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id       UUID NOT NULL,
     provider      TEXT NOT NULL,
     key_name      TEXT NOT NULL DEFAULT 'default',
     encrypted_key TEXT NOT NULL,
@@ -62,8 +47,6 @@ CREATE TABLE IF NOT EXISTS public.api_keys (
 );
 
 COMMENT ON TABLE public.api_keys IS 'User-provided LLM API keys, encrypted with Fernet at app layer';
-COMMENT ON COLUMN public.api_keys.provider IS 'Provider ID: openrouter, anthropic, xai, openai, custom';
-COMMENT ON COLUMN public.api_keys.encrypted_key IS 'Fernet-encrypted API key, never stored in plaintext';
 
 
 -- ═══════════════════════════════════════════════════════════════
@@ -71,7 +54,7 @@ COMMENT ON COLUMN public.api_keys.encrypted_key IS 'Fernet-encrypted API key, ne
 -- ═══════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.chat_sessions (
     id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id       UUID NOT NULL,
     title         TEXT DEFAULT 'New Chat',
     provider      TEXT NOT NULL,
     model         TEXT NOT NULL,
@@ -92,7 +75,7 @@ COMMENT ON TABLE public.chat_sessions IS 'Chat conversation sessions with per-se
 CREATE TABLE IF NOT EXISTS public.chat_messages (
     id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     session_id    UUID NOT NULL REFERENCES public.chat_sessions(id) ON DELETE CASCADE,
-    user_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id       UUID NOT NULL,
     role          TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
     content       TEXT NOT NULL,
     token_count   INTEGER,
@@ -111,7 +94,7 @@ COMMENT ON TABLE public.chat_messages IS 'Individual messages within a chat sess
 -- ═══════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.agents (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL,
     name            TEXT NOT NULL,
     description     TEXT,
     system_prompt   TEXT NOT NULL,
@@ -192,59 +175,7 @@ CREATE INDEX IF NOT EXISTS idx_agents_user ON public.agents(user_id);
 
 
 -- ═══════════════════════════════════════════════════════════════
--- 8. ROW-LEVEL SECURITY (RLS)
--- Users can only access their own data
--- ═══════════════════════════════════════════════════════════════
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.api_keys ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.chat_sessions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.agents ENABLE ROW LEVEL SECURITY;
-
--- Profiles: users manage their own
-DROP POLICY IF EXISTS "Users manage own profile" ON public.profiles;
-CREATE POLICY "Users manage own profile"
-    ON public.profiles FOR ALL
-    USING (auth.uid() = id)
-    WITH CHECK (auth.uid() = id);
-
--- API Keys: users manage their own
-DROP POLICY IF EXISTS "Users manage own API keys" ON public.api_keys;
-CREATE POLICY "Users manage own API keys"
-    ON public.api_keys FOR ALL
-    USING (auth.uid() = user_id)
-    WITH CHECK (auth.uid() = user_id);
-
--- Chat Sessions: users manage their own
-DROP POLICY IF EXISTS "Users manage own sessions" ON public.chat_sessions;
-CREATE POLICY "Users manage own sessions"
-    ON public.chat_sessions FOR ALL
-    USING (auth.uid() = user_id)
-    WITH CHECK (auth.uid() = user_id);
-
--- Chat Messages: users manage their own
-DROP POLICY IF EXISTS "Users manage own messages" ON public.chat_messages;
-CREATE POLICY "Users manage own messages"
-    ON public.chat_messages FOR ALL
-    USING (auth.uid() = user_id)
-    WITH CHECK (auth.uid() = user_id);
-
--- Agents: users manage own, read public
-DROP POLICY IF EXISTS "Users manage own agents" ON public.agents;
-CREATE POLICY "Users manage own agents"
-    ON public.agents FOR ALL
-    USING (auth.uid() = user_id OR is_public = TRUE)
-    WITH CHECK (auth.uid() = user_id);
-
--- Providers: readable by all authenticated users
-DROP POLICY IF EXISTS "Anyone can read providers" ON public.providers;
-CREATE POLICY "Anyone can read providers"
-    ON public.providers FOR SELECT
-    USING (TRUE);
-
-
--- ═══════════════════════════════════════════════════════════════
--- 9. TRIGGERS — Auto-update updated_at
+-- 8. TRIGGERS — Auto-update updated_at
 -- ═══════════════════════════════════════════════════════════════
 CREATE OR REPLACE FUNCTION public.update_updated_at()
 RETURNS TRIGGER AS $$
@@ -272,8 +203,7 @@ CREATE TRIGGER trg_agents_updated BEFORE UPDATE ON public.agents
 
 
 -- ═══════════════════════════════════════════════════════════════
--- 10. MESSAGE COUNT TRIGGER
--- Auto-increment session message_count on new message
+-- 9. MESSAGE COUNT TRIGGER
 -- ═══════════════════════════════════════════════════════════════
 CREATE OR REPLACE FUNCTION public.increment_message_count()
 RETURNS TRIGGER AS $$
