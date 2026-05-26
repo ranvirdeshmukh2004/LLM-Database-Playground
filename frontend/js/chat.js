@@ -1,5 +1,10 @@
 /**
  * chat.js — Chat UI, SSE streaming, message rendering
+ *
+ * KEY FIX: Uses direct element references for streaming, not IDs.
+ * The old code used getElementById('streaming-content') which returned
+ * the FIRST element with that ID — if a previous message still had it,
+ * new responses would overwrite old messages instead of their own bubble.
  */
 
 let currentSessionId = null;
@@ -8,6 +13,11 @@ let isStreaming = false;
 let abortController = null;
 let timerInterval = null;
 let timerStart = 0;
+
+// Direct element references for the current streaming operation.
+// These hold references to the ACTUAL DOM elements, not IDs.
+let activeStreamingMsg = null;
+let activeStreamingContent = null;
 
 // ── Message rendering ──────────────────────────────────────
 function renderMessage(role, content, meta = {}) {
@@ -55,43 +65,57 @@ function renderMessage(role, content, meta = {}) {
     return msgDiv;
 }
 
-function renderStreamingMessage() {
+function createStreamingBubble() {
     const container = document.getElementById('chat-messages');
+    const emptyState = document.getElementById('empty-state');
+    if (emptyState) emptyState.style.display = 'none';
+
     const msgDiv = document.createElement('div');
     msgDiv.className = 'message';
-    msgDiv.id = 'streaming-msg';
+
+    // Build the bubble structure with a direct reference to the content div
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'msg-bubble';
+    contentDiv.innerHTML = `
+        <div class="typing-indicator">
+            <span></span><span></span><span></span>
+        </div>
+    `;
 
     msgDiv.innerHTML = `
         <div class="msg-row assistant">
             <div class="msg-avatar assistant-avatar">✦</div>
-            <div>
-                <div class="msg-bubble" id="streaming-content">
-                    <div class="typing-indicator">
-                        <span></span><span></span><span></span>
-                    </div>
-                </div>
-            </div>
+            <div class="msg-content-wrapper"></div>
         </div>
     `;
 
+    // Append contentDiv to the inner wrapper div
+    const innerDiv = msgDiv.querySelector('.msg-content-wrapper');
+    innerDiv.appendChild(contentDiv);
+
     container.appendChild(msgDiv);
     container.scrollTop = container.scrollHeight;
+
+    // Store DIRECT references — no IDs used at all
+    activeStreamingMsg = msgDiv;
+    activeStreamingContent = contentDiv;
+
     return msgDiv;
 }
 
-function updateStreamingContent(text) {
-    const el = document.getElementById('streaming-content');
-    if (!el) return;
+function updateStreamingBubble(text) {
+    // Uses direct element reference, NOT getElementById
+    if (!activeStreamingContent) return;
 
     let rendered = text;
     if (window.marked) {
         try { rendered = marked.parse(text); } catch { rendered = text; }
     }
 
-    el.innerHTML = rendered;
+    activeStreamingContent.innerHTML = rendered;
 
     // Highlight code
-    el.querySelectorAll('pre code').forEach(block => {
+    activeStreamingContent.querySelectorAll('pre code').forEach(block => {
         if (window.hljs) hljs.highlightElement(block);
     });
 
@@ -99,19 +123,20 @@ function updateStreamingContent(text) {
     container.scrollTop = container.scrollHeight;
 }
 
-function finalizeStreamingMessage(latencyMs, model) {
-    const msgDiv = document.getElementById('streaming-msg');
-    if (!msgDiv) return;
+function finalizeStreamingBubble(latencyMs, model) {
+    if (!activeStreamingMsg) return;
 
-    msgDiv.removeAttribute('id');
-
-    // Add metadata
+    // Add metadata below the bubble
     const metaDiv = document.createElement('div');
     metaDiv.className = 'msg-meta';
     metaDiv.textContent = `${latencyMs}ms${model ? ' · ' + model : ''}`;
 
-    const bubbleParent = msgDiv.querySelector('.msg-row.assistant > div:last-child');
+    const bubbleParent = activeStreamingMsg.querySelector('.msg-content-wrapper');
     if (bubbleParent) bubbleParent.appendChild(metaDiv);
+
+    // Clear references — critical to prevent stale references
+    activeStreamingMsg = null;
+    activeStreamingContent = null;
 }
 
 // ── Send message ───────────────────────────────────────────
@@ -128,16 +153,19 @@ async function sendMessage() {
         return;
     }
 
-    // Add user message
+    // Lock UI immediately — prevent any double-sends
+    isStreaming = true;
+    setStreamingUI(true);
+
+    // Add user message to conversation
     chatMessages.push({ role: 'user', content: text });
     renderMessage('user', text);
     input.value = '';
     autoResizeInput();
 
-    // Show streaming placeholder
-    renderStreamingMessage();
+    // Create streaming placeholder bubble (uses direct references)
+    createStreamingBubble();
     startTimer();
-    setStreamingUI(true);
 
     abortController = new AbortController();
     let fullResponse = '';
@@ -145,7 +173,7 @@ async function sendMessage() {
 
     try {
         const systemPrompt = 'You are a helpful AI assistant.';
-        await ensureValidToken(); // Refresh token before streaming
+        await ensureValidToken(); // Refresh JWT if expired
         const resp = await fetch('/api/chat', {
             method: 'POST',
             headers: authHeaders(),
@@ -193,7 +221,7 @@ async function sendMessage() {
                 try {
                     const parsed = JSON.parse(data);
 
-                    // Check for error
+                    // Check for error from provider
                     if (parsed.error) {
                         throw new Error(parsed.error);
                     }
@@ -201,7 +229,7 @@ async function sendMessage() {
                     const delta = parsed.choices?.[0]?.delta;
                     if (delta?.content) {
                         fullResponse += delta.content;
-                        updateStreamingContent(fullResponse);
+                        updateStreamingBubble(fullResponse);
                     }
                 } catch (e) {
                     if (e.message && !e.message.includes('JSON')) {
@@ -214,24 +242,29 @@ async function sendMessage() {
     } catch (err) {
         if (err.name === 'AbortError') {
             fullResponse += '\n\n*[Generation stopped]*';
-            updateStreamingContent(fullResponse);
+            updateStreamingBubble(fullResponse);
         } else {
             const errorContent = `**Error:** ${err.message}`;
-            updateStreamingContent(errorContent);
+            fullResponse = ''; // Don't save error as assistant message
+            updateStreamingBubble(errorContent);
             showToast(err.message, 'error');
         }
     }
 
     const latencyMs = Math.round(performance.now() - t0);
     stopTimer();
-    finalizeStreamingMessage(latencyMs, model);
+    finalizeStreamingBubble(latencyMs, model);
+
+    // Unlock UI
+    isStreaming = false;
     setStreamingUI(false);
 
+    // Save assistant response to conversation memory
     if (fullResponse) {
         chatMessages.push({ role: 'assistant', content: fullResponse });
     }
 
-    // Refresh session list
+    // Refresh session list in sidebar
     loadSessions();
 }
 
@@ -246,30 +279,39 @@ function stopGeneration() {
 function startTimer() {
     timerStart = performance.now();
     const badge = document.getElementById('timer-badge');
-    badge.classList.add('active');
+    if (badge) badge.classList.add('active');
 
     timerInterval = setInterval(() => {
         const elapsed = ((performance.now() - timerStart) / 1000).toFixed(2);
-        document.getElementById('timer-display').textContent = `${elapsed}s`;
+        const display = document.getElementById('timer-display');
+        if (display) display.textContent = `${elapsed}s`;
     }, 50);
 }
 
 function stopTimer() {
     clearInterval(timerInterval);
     const badge = document.getElementById('timer-badge');
-    badge.classList.remove('active');
+    if (badge) badge.classList.remove('active');
 }
 
 // ── UI state ───────────────────────────────────────────────
 function setStreamingUI(streaming) {
-    isStreaming = streaming;
-    document.getElementById('send-btn').disabled = streaming;
-    document.getElementById('stop-btn').classList.toggle('hidden', !streaming);
+    const sendBtn = document.getElementById('send-btn');
+    const chatInput = document.getElementById('chat-input');
+    const stopBtn = document.getElementById('stop-btn');
+
+    if (sendBtn) sendBtn.disabled = streaming;
+    if (chatInput) chatInput.disabled = streaming;
+    if (stopBtn) stopBtn.classList.toggle('hidden', !streaming);
 }
 
 function clearChat() {
     currentSessionId = null;
     chatMessages = [];
+    activeStreamingMsg = null;
+    activeStreamingContent = null;
+    isStreaming = false;
+
     const container = document.getElementById('chat-messages');
     container.innerHTML = `
         <div id="empty-state" class="empty-state">
@@ -312,7 +354,7 @@ async function loadSession(sessionId) {
             document.getElementById('model-select').value = session.model;
         }, 100);
 
-        // Clear and render messages
+        // Clear and render all messages from history
         const container = document.getElementById('chat-messages');
         container.innerHTML = '';
         for (const msg of session.messages) {
@@ -344,6 +386,7 @@ function escapeHtml(text) {
 
 function autoResizeInput() {
     const input = document.getElementById('chat-input');
+    if (!input) return;
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 160) + 'px';
 }
