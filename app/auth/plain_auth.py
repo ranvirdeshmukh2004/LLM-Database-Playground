@@ -23,13 +23,13 @@ logger = logging.getLogger("app.auth.plain")
 
 
 def hash_password(password: str) -> str:
-    """Hash a password using bcrypt."""
-    return bcrypt.hash(password)
+    """Hash a password using bcrypt (truncated to 72 bytes per bcrypt spec)."""
+    return bcrypt.hash(password[:72])
 
 
 def verify_password(password: str, hashed: str) -> bool:
     """Verify a password against a bcrypt hash."""
-    return bcrypt.verify(password, hashed)
+    return bcrypt.verify(password[:72], hashed)
 
 
 def create_tokens(user_id: str, email: str, role: str = "authenticated") -> dict:
