@@ -54,6 +54,31 @@ function showApp() {
     loadSessions();
     loadKeys();
     loadAgents();
+    fetchDbMode();
+}
+
+// ── DB Mode Badge ──────────────────────────────────────────
+async function fetchDbMode() {
+    try {
+        const resp = await fetch('/health');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const badge = document.getElementById('db-mode-badge');
+        if (!badge) return;
+
+        const mode = data.db_mode || 'supabase';
+        if (mode === 'plain') {
+            badge.textContent = '🔵 Plain PG';
+            badge.classList.add('plain');
+            badge.title = 'Database: Plain PostgreSQL (app-managed auth)';
+        } else {
+            badge.textContent = '🟢 Supabase';
+            badge.classList.add('supabase');
+            badge.title = 'Database: Supabase PostgreSQL (GoTrue auth)';
+        }
+    } catch (e) {
+        console.warn('Could not fetch DB mode:', e);
+    }
 }
 
 function switchView(view) {

@@ -20,6 +20,19 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # ── Database Mode Toggle ────────────────────────────────
+    # 'supabase' = Full Supabase stack (GoTrue, Kong, RLS)
+    # 'plain'    = Plain PostgreSQL + app-managed auth
+    db_mode: str = "supabase"
+
+    @property
+    def is_plain_mode(self) -> bool:
+        return self.db_mode.lower() == "plain"
+
+    @property
+    def is_supabase_mode(self) -> bool:
+        return self.db_mode.lower() != "plain"
+
     # ── PostgreSQL ───────────────────────────────────────────
     postgres_host: str = "supabase-db"
     postgres_port: int = 5432
@@ -66,6 +79,11 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    @property
+    def effective_db_host(self) -> str:
+        """Return the correct DB host based on mode."""
+        return self.postgres_host
 
 
 @lru_cache()

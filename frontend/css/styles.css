@@ -306,6 +306,19 @@ html, body {
 }
 .timer-badge.active { color: var(--accent-bright); border-color: var(--accent); }
 
+/* DB Mode badge */
+.db-mode-badge {
+    padding: 3px 10px; border-radius: 6px; font-size: 10px;
+    font-weight: 600; letter-spacing: 0.03em;
+    display: inline-flex; align-items: center; gap: 4px;
+}
+.db-mode-badge.supabase {
+    background: #34d39920; color: #34d399; border: 1px solid #34d39940;
+}
+.db-mode-badge.plain {
+    background: #60a5fa20; color: #60a5fa; border: 1px solid #60a5fa40;
+}
+
 /* ── View containers ─────────────────────────────────────── */
 .view-container { display: none; flex: 1; min-height: 0; overflow: hidden; flex-direction: column; }
 .view-container.active { display: flex; }

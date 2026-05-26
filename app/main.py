@@ -71,12 +71,20 @@ app.add_middleware(
 )
 
 # ── Register Routes ──────────────────────────────────────────
-from app.routes.auth import router as auth_router
 from app.routes.api_keys import router as keys_router
 from app.routes.sessions import router as sessions_router
 from app.routes.chat import router as chat_router
 from app.routes.agents import router as agents_router
 from app.routes.providers import router as providers_router
+
+# Conditional auth router based on DB_MODE
+_settings = get_settings()
+if _settings.is_plain_mode:
+    from app.routes.auth_plain import router as auth_router
+    logger.info("Auth mode: PLAIN (app-managed bcrypt + JWT)")
+else:
+    from app.routes.auth import router as auth_router
+    logger.info("Auth mode: SUPABASE (GoTrue)")
 
 app.include_router(auth_router)
 app.include_router(keys_router)
@@ -96,7 +104,13 @@ if os.path.isdir(frontend_dir):
 # ── Health Check ─────────────────────────────────────────────
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "ai-agent-platform", "version": "0.1.0"}
+    settings = get_settings()
+    return {
+        "status": "ok",
+        "service": "ai-agent-platform",
+        "version": "0.1.0",
+        "db_mode": settings.db_mode,
+    }
 
 
 # ── Root → Serve Frontend ───────────────────────────────────
