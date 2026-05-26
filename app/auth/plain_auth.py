@@ -14,7 +14,7 @@ import time
 import uuid
 
 from jose import jwt
-from passlib.hash import bcrypt
+import bcrypt as _bcrypt
 
 from app.config import get_settings
 from app.database import get_connection
@@ -23,13 +23,16 @@ logger = logging.getLogger("app.auth.plain")
 
 
 def hash_password(password: str) -> str:
-    """Hash a password using bcrypt (truncated to 72 bytes per bcrypt spec)."""
-    return bcrypt.hash(password[:72])
+    """Hash a password using bcrypt."""
+    pw_bytes = password.encode("utf-8")[:72]
+    salt = _bcrypt.gensalt()
+    return _bcrypt.hashpw(pw_bytes, salt).decode("utf-8")
 
 
 def verify_password(password: str, hashed: str) -> bool:
     """Verify a password against a bcrypt hash."""
-    return bcrypt.verify(password[:72], hashed)
+    pw_bytes = password.encode("utf-8")[:72]
+    return _bcrypt.checkpw(pw_bytes, hashed.encode("utf-8"))
 
 
 def create_tokens(user_id: str, email: str, role: str = "authenticated") -> dict:
