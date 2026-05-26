@@ -7,7 +7,7 @@ let agentsList = [];
 // ── Load agents ────────────────────────────────────────────
 async function loadAgents() {
     try {
-        const resp = await fetch('/api/agents', { headers: authHeaders() });
+        const resp = await authFetch('/api/agents');
         if (!resp.ok) return;
 
         agentsList = await resp.json();
@@ -61,9 +61,8 @@ async function handleAddAgent(e) {
     }
 
     try {
-        const resp = await fetch('/api/agents', {
+        const resp = await authFetch('/api/agents', {
             method: 'POST',
-            headers: authHeaders(),
             body: JSON.stringify({
                 name,
                 description,
@@ -114,9 +113,8 @@ async function deleteAgent(agentId) {
     if (!confirm('Delete this agent?')) return;
 
     try {
-        const resp = await fetch(`/api/agents/${agentId}`, {
+        const resp = await authFetch(`/api/agents/${agentId}`, {
             method: 'DELETE',
-            headers: authHeaders(),
         });
 
         if (!resp.ok) throw new Error('Failed to delete agent');

@@ -145,6 +145,7 @@ async function sendMessage() {
 
     try {
         const systemPrompt = 'You are a helpful AI assistant.';
+        await ensureValidToken(); // Refresh token before streaming
         const resp = await fetch('/api/chat', {
             method: 'POST',
             headers: authHeaders(),
@@ -297,7 +298,7 @@ function startNewChat() {
 // ── Load session messages ──────────────────────────────────
 async function loadSession(sessionId) {
     try {
-        const resp = await fetch(`/api/sessions/${sessionId}`, { headers: authHeaders() });
+        const resp = await authFetch(`/api/sessions/${sessionId}`);
         if (!resp.ok) throw new Error('Failed to load session');
 
         const session = await resp.json();

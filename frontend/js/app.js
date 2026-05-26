@@ -78,7 +78,7 @@ function toggleSidebar() {
 // ═══════════════════════════════════════════════════════════
 async function loadProviders() {
     try {
-        const resp = await fetch('/api/providers', { headers: authHeaders() });
+        const resp = await authFetch('/api/providers');
         if (!resp.ok) return;
 
         providersData = await resp.json();
@@ -126,7 +126,7 @@ function onModelChange() {
 // ═══════════════════════════════════════════════════════════
 async function loadSessions() {
     try {
-        const resp = await fetch('/api/sessions?limit=30', { headers: authHeaders() });
+        const resp = await authFetch('/api/sessions?limit=30');
         if (!resp.ok) return;
 
         const sessions = await resp.json();
@@ -164,9 +164,8 @@ async function deleteSession(sessionId) {
     if (!confirm('Delete this conversation?')) return;
 
     try {
-        await fetch(`/api/sessions/${sessionId}`, {
+        await authFetch(`/api/sessions/${sessionId}`, {
             method: 'DELETE',
-            headers: authHeaders(),
         });
 
         if (currentSessionId === sessionId) {

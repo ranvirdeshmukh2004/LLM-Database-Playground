@@ -21,7 +21,7 @@ const PROVIDER_INITIALS = {
 // ── Load keys ──────────────────────────────────────────────
 async function loadKeys() {
     try {
-        const resp = await fetch('/api/keys', { headers: authHeaders() });
+        const resp = await authFetch('/api/keys');
         if (!resp.ok) return;
 
         const keys = await resp.json();
@@ -77,9 +77,8 @@ async function handleAddKey(e) {
     }
 
     try {
-        const resp = await fetch('/api/keys', {
+        const resp = await authFetch('/api/keys', {
             method: 'POST',
-            headers: authHeaders(),
             body: JSON.stringify({
                 provider,
                 api_key: apiKey,
@@ -108,9 +107,8 @@ async function handleAddKey(e) {
 async function testKey(keyId) {
     try {
         showToast('Testing API key...', 'info');
-        const resp = await fetch(`/api/keys/${keyId}/test`, {
+        const resp = await authFetch(`/api/keys/${keyId}/test`, {
             method: 'POST',
-            headers: authHeaders(),
         });
 
         const result = await resp.json();
@@ -132,9 +130,8 @@ async function deleteKey(keyId) {
     if (!confirm('Delete this API key?')) return;
 
     try {
-        const resp = await fetch(`/api/keys/${keyId}`, {
+        const resp = await authFetch(`/api/keys/${keyId}`, {
             method: 'DELETE',
-            headers: authHeaders(),
         });
 
         if (!resp.ok) throw new Error('Failed to delete key');

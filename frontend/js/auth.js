@@ -29,11 +29,15 @@ function getRefreshToken() {
 function setTokens(access, refresh) {
     localStorage.setItem('access_token', access);
     localStorage.setItem('refresh_token', refresh);
+    // Store expiry time (GoTrue default = 3600s, refresh at 80%)
+    const expiresAt = Date.now() + 3600 * 1000;
+    localStorage.setItem('token_expires_at', expiresAt.toString());
 }
 
 function clearTokens() {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem('token_expires_at');
     localStorage.removeItem('user');
 }
 
@@ -49,6 +53,50 @@ function setStoredUser(user) {
     localStorage.setItem('user', JSON.stringify(user));
 }
 
+function isTokenExpired() {
+    const expiresAt = parseInt(localStorage.getItem('token_expires_at') || '0');
+    // Refresh when 80% of lifetime has passed (48 min for 60 min token)
+    return Date.now() > expiresAt - (720 * 1000);
+}
+
+// ── Auto-refresh token ─────────────────────────────────────
+let refreshPromise = null;
+
+async function ensureValidToken() {
+    if (!getAccessToken() || !getRefreshToken()) return;
+    if (!isTokenExpired()) return;
+
+    // Prevent multiple simultaneous refresh calls
+    if (refreshPromise) return refreshPromise;
+
+    refreshPromise = (async () => {
+        try {
+            console.log('[auth] Token expired, refreshing...');
+            const resp = await fetch('/api/auth/refresh', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: getRefreshToken() }),
+            });
+
+            if (resp.ok) {
+                const data = await resp.json();
+                setTokens(data.access_token, data.refresh_token);
+                console.log('[auth] Token refreshed successfully');
+            } else {
+                console.warn('[auth] Token refresh failed, logging out');
+                clearTokens();
+                showAuth();
+            }
+        } catch (err) {
+            console.error('[auth] Refresh error:', err);
+        } finally {
+            refreshPromise = null;
+        }
+    })();
+
+    return refreshPromise;
+}
+
 // ── Auth header helper ─────────────────────────────────────
 function authHeaders() {
     const token = getAccessToken();
@@ -56,6 +104,23 @@ function authHeaders() {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
     };
+}
+
+// Wrapper for authenticated fetch — auto-refreshes token
+async function authFetch(url, options = {}) {
+    await ensureValidToken();
+    const headers = { ...authHeaders(), ...(options.headers || {}) };
+    const resp = await fetch(url, { ...options, headers });
+
+    // If 401, try one refresh then retry
+    if (resp.status === 401 && getRefreshToken()) {
+        localStorage.setItem('token_expires_at', '0'); // Force refresh
+        await ensureValidToken();
+        const retryHeaders = { ...authHeaders(), ...(options.headers || {}) };
+        return fetch(url, { ...options, headers: retryHeaders });
+    }
+
+    return resp;
 }
 
 // ── Auth API calls ─────────────────────────────────────────

@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 class AuthSignUpRequest(BaseModel):
     email: str
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=6)
     display_name: Optional[str] = None
 
 

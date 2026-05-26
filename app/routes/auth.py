@@ -9,6 +9,7 @@ import logging
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from app.auth.dependencies import AuthenticatedUser, get_current_user
 from app.config import Settings, get_settings
@@ -97,20 +98,23 @@ async def login(
         raise HTTPException(502, "Could not connect to auth service")
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
 @router.post("/refresh")
-async def refresh_token(
+async def refresh_token_endpoint(
+    body: RefreshRequest,
     settings: Settings = Depends(get_settings),
-    refresh_token: str = "",
 ):
     """Refresh an expired access token."""
-    if not refresh_token:
+    if not body.refresh_token:
         raise HTTPException(400, "refresh_token is required")
 
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             resp = await client.post(
                 f"{GOTRUE_URL}/token?grant_type=refresh_token",
-                json={"refresh_token": refresh_token},
+                json={"refresh_token": body.refresh_token},
                 headers={
                     "Content-Type": "application/json",
                 },
