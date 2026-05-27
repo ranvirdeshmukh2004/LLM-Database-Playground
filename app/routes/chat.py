@@ -35,6 +35,11 @@ async def chat(
     """
     # Get user's API key for the provider
     api_key = await get_user_api_key(user.id, body.provider)
+    logger.info(
+        f"CHAT KEY: user={user.id[:8]}... provider={body.provider} "
+        f"key_found={bool(api_key)} key_len={len(api_key) if api_key else 0} "
+        f"key_prefix={api_key[:8] + '...' if api_key and len(api_key) > 8 else 'N/A'}"
+    )
     if not api_key:
         raise HTTPException(
             400,
