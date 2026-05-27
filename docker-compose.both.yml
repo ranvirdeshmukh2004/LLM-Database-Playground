@@ -316,7 +316,7 @@ services:
       plain-db:
         condition: service_healthy
     ports:
-      - "127.0.0.1:7861:7861"
+      - "127.0.0.1:7861:7860"
     environment:
       - DB_MODE=plain
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -328,7 +328,7 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - APP_SECRET_KEY=${APP_SECRET_KEY}
       - APP_HOST=0.0.0.0
-      - APP_PORT=7861
+      - APP_PORT=7860
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - ENVIRONMENT=${ENVIRONMENT:-development}
     volumes:
@@ -336,7 +336,7 @@ services:
       - ./frontend:/app/frontend:ro
       - plain-app-logs:/app/logs
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:7861/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:7860/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
