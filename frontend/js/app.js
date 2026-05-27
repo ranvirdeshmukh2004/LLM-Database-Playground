@@ -9,6 +9,9 @@ let providersData = [];
 // App Initialization
 // ═══════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
+    // Restore DB toggle state on login screen
+    restoreDbToggle();
+
     // Check auth state
     if (isAuthenticated()) {
         showApp();
@@ -59,25 +62,20 @@ function showApp() {
 
 // ── DB Mode Badge ──────────────────────────────────────────
 async function fetchDbMode() {
-    try {
-        const resp = await fetch('/health');
-        if (!resp.ok) return;
-        const data = await resp.json();
-        const badge = document.getElementById('db-mode-badge');
-        if (!badge) return;
+    const badge = document.getElementById('db-mode-badge');
+    if (!badge) return;
 
-        const mode = data.db_mode || 'supabase';
-        if (mode === 'plain') {
-            badge.textContent = '🔵 Plain PG';
-            badge.classList.add('plain');
-            badge.title = 'Database: Plain PostgreSQL (app-managed auth)';
-        } else {
-            badge.textContent = '🟢 Supabase';
-            badge.classList.add('supabase');
-            badge.title = 'Database: Supabase PostgreSQL (GoTrue auth)';
-        }
-    } catch (e) {
-        console.warn('Could not fetch DB mode:', e);
+    const mode = getDbMode();
+    badge.className = 'db-mode-badge'; // reset
+
+    if (mode === 'plain') {
+        badge.textContent = '🔵 Plain PG';
+        badge.classList.add('plain');
+        badge.title = 'Database: Plain PostgreSQL (app-managed auth)';
+    } else {
+        badge.textContent = '🟢 Supabase';
+        badge.classList.add('supabase');
+        badge.title = 'Database: Supabase PostgreSQL (GoTrue auth)';
     }
 }
 

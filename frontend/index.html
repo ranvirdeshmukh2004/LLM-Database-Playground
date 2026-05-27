@@ -75,6 +75,24 @@
                     </button>
                 </form>
 
+                <!-- DB Mode Toggle -->
+                <div class="db-toggle-section">
+                    <div class="db-toggle-label">Database Engine</div>
+                    <div class="db-toggle-switch">
+                        <button id="db-toggle-supabase" class="db-toggle-btn active" onclick="selectDbMode('supabase')">
+                            <span class="db-toggle-dot supabase-dot"></span>
+                            Supabase PG
+                        </button>
+                        <button id="db-toggle-plain" class="db-toggle-btn" onclick="selectDbMode('plain')">
+                            <span class="db-toggle-dot plain-dot"></span>
+                            Plain PG
+                        </button>
+                    </div>
+                    <div class="db-toggle-info" id="db-toggle-info">
+                        GoTrue auth · Row-Level Security · Full Supabase stack
+                    </div>
+                </div>
+
                 <div class="auth-providers-section">
                     <div class="auth-divider"><span>Supported Providers</span></div>
                     <div class="provider-badges">

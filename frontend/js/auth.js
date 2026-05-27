@@ -17,6 +17,46 @@ function initSupabaseAuth(url, anonKey) {
     }
 }
 
+// ── DB Mode toggle ─────────────────────────────────────────
+function getDbMode() {
+    return localStorage.getItem('db_mode') || 'supabase';
+}
+
+function selectDbMode(mode) {
+    localStorage.setItem('db_mode', mode);
+    // Clear tokens when switching modes (different DBs, different users)
+    clearTokens();
+
+    // Update toggle UI
+    document.getElementById('db-toggle-supabase').classList.toggle('active', mode === 'supabase');
+    document.getElementById('db-toggle-plain').classList.toggle('active', mode === 'plain');
+
+    // Update info text
+    const info = document.getElementById('db-toggle-info');
+    if (info) {
+        info.textContent = mode === 'plain'
+            ? 'App-managed auth (bcrypt + JWT) · No RLS · Lightweight'
+            : 'GoTrue auth · Row-Level Security · Full Supabase stack';
+    }
+}
+
+// Restore toggle state on page load
+function restoreDbToggle() {
+    const mode = getDbMode();
+    const supaBtn = document.getElementById('db-toggle-supabase');
+    const plainBtn = document.getElementById('db-toggle-plain');
+    if (supaBtn && plainBtn) {
+        supaBtn.classList.toggle('active', mode === 'supabase');
+        plainBtn.classList.toggle('active', mode === 'plain');
+    }
+    const info = document.getElementById('db-toggle-info');
+    if (info) {
+        info.textContent = mode === 'plain'
+            ? 'App-managed auth (bcrypt + JWT) · No RLS · Lightweight'
+            : 'GoTrue auth · Row-Level Security · Full Supabase stack';
+    }
+}
+
 // ── Token management ───────────────────────────────────────
 function getAccessToken() {
     return localStorage.getItem('access_token') || '';
@@ -74,7 +114,7 @@ async function ensureValidToken() {
             console.log('[auth] Token expired, refreshing...');
             const resp = await fetch('/api/auth/refresh', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-DB-Mode': getDbMode() },
                 body: JSON.stringify({ refresh_token: getRefreshToken() }),
             });
 
@@ -103,6 +143,7 @@ function authHeaders() {
     return {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
+        'X-DB-Mode': getDbMode(),
     };
 }
 
@@ -127,7 +168,7 @@ async function authFetch(url, options = {}) {
 async function signUp(email, password, displayName) {
     const resp = await fetch('/api/auth/signup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-DB-Mode': getDbMode() },
         body: JSON.stringify({ email, password, display_name: displayName }),
     });
 
@@ -145,7 +186,7 @@ async function signUp(email, password, displayName) {
 async function signIn(email, password) {
     const resp = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-DB-Mode': getDbMode() },
         body: JSON.stringify({ email, password }),
     });
 

@@ -161,6 +161,42 @@ html, body {
     color: var(--text-secondary);
 }
 
+/* ── DB Mode Toggle (login screen) ──────────────────────── */
+.db-toggle-section {
+    padding: 0 24px 20px; text-align: center;
+}
+.db-toggle-label {
+    font-size: 10px; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin-bottom: 10px;
+}
+.db-toggle-switch {
+    display: inline-flex; gap: 0;
+    background: var(--bg-tertiary); border-radius: 10px;
+    border: 1px solid var(--border-color); overflow: hidden;
+}
+.db-toggle-btn {
+    padding: 8px 18px; border: none; background: transparent;
+    color: var(--text-muted); font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.25s;
+    display: flex; align-items: center; gap: 6px;
+    font-family: 'Inter', sans-serif;
+}
+.db-toggle-btn:hover { color: var(--text-secondary); }
+.db-toggle-btn.active {
+    background: var(--bg-hover); color: var(--text-primary);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.db-toggle-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+}
+.supabase-dot { background: #34d399; box-shadow: 0 0 6px #34d39960; }
+.plain-dot { background: #60a5fa; box-shadow: 0 0 6px #60a5fa60; }
+.db-toggle-info {
+    margin-top: 8px; font-size: 11px; color: var(--text-muted);
+    line-height: 1.4; transition: all 0.3s;
+}
+
 .hidden { display: none !important; }
 
 /* ═══════════════════════════════════════════════════════════
