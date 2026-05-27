@@ -96,7 +96,14 @@ app.include_router(providers_router)
 
 # ── Static Files (Frontend) ─────────────────────────────────
 # Serve the frontend SPA
-frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend-react", "dist")
+
+# We mount /assets explicitly so Vite can load CSS/JS
+assets_dir = os.path.join(frontend_dir, "assets")
+if os.path.isdir(assets_dir):
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+# We mount /static for backwards compatibility (in case anything still uses it)
 if os.path.isdir(frontend_dir):
     app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
 
@@ -114,6 +121,8 @@ async def health():
 
 
 # ── Root → Serve Frontend ───────────────────────────────────
+from fastapi.responses import HTMLResponse, JSONResponse
+
 @app.get("/")
 async def root():
     """Serve the frontend SPA."""
@@ -121,10 +130,21 @@ async def root():
     if os.path.exists(index_path):
         with open(index_path, "r") as f:
             content = f.read()
-        from fastapi.responses import HTMLResponse
         return HTMLResponse(content=content)
     return JSONResponse({"message": "AI Agent Platform API", "docs": "/docs"})
 
+# Catch-all route for SPA navigation (so refreshing /chat doesn't 404)
+@app.get("/{path:path}")
+async def catch_all(path: str):
+    if path.startswith("api/") or path.startswith("assets/"):
+        return JSONResponse({"detail": "Not found"}, status_code=404)
+        
+    index_path = os.path.join(frontend_dir, "index.html")
+    if os.path.exists(index_path):
+        with open(index_path, "r") as f:
+            content = f.read()
+        return HTMLResponse(content=content)
+    return JSONResponse({"message": "AI Agent Platform API", "docs": "/docs"})
 
 # ── Entrypoint ───────────────────────────────────────────────
 if __name__ == "__main__":
