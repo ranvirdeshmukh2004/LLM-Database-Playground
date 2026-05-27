@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { authFetch, getDbMode } from '../api/client';
+import { authFetch, getUserId } from '../api/client';
 import ChatMessage from '../components/ChatMessage';
 import ChatInput from '../components/ChatInput';
 import EmptyState from '../components/EmptyState';
@@ -63,9 +63,8 @@ export default function ChatPage({ provider, model, sessionId, onSessionCreated,
       const resp = await fetch('/api/chat', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
           'Content-Type': 'application/json',
-          'X-DB-Mode': getDbMode(),
+          'X-User-Id': getUserId(),
         },
         body: JSON.stringify({
           session_id: sessionId,

@@ -1,9 +1,4 @@
-import { useAuth } from '../context/AuthContext';
-
 export default function Sidebar({ sessions, activeSession, onSelectSession, onDeleteSession, onNewChat, activeView, onSwitchView }) {
-  const { user, logout } = useAuth();
-  const email = user?.email || '';
-
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
@@ -63,14 +58,9 @@ export default function Sidebar({ sessions, activeSession, onSelectSession, onDe
 
       <div className="sidebar-footer">
         <div className="user-info">
-          <div className="user-avatar">{email.charAt(0).toUpperCase()}</div>
-          <span className="user-email">{email}</span>
+          <div className="user-avatar" style={{ background: 'var(--accent-glow)' }}>A</div>
+          <span className="user-email">Anonymous Session</span>
         </div>
-        <button onClick={logout} className="btn-icon-sm" title="Logout">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-        </button>
       </div>
     </aside>
   );

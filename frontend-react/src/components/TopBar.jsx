@@ -1,7 +1,4 @@
-import { getDbMode } from '../api/client';
-
 export default function TopBar({ providers, selectedProvider, selectedModel, onProviderChange, onModelChange, timerDisplay, onToggleSidebar }) {
-  const dbMode = getDbMode();
   const provider = providers.find(p => p.id === selectedProvider);
   const models = provider?.models || [];
 
@@ -33,8 +30,8 @@ export default function TopBar({ providers, selectedProvider, selectedModel, onP
         </select>
       </div>
       <div className="top-bar-right">
-        <span className={`db-mode-badge ${dbMode}`} title={`Database: ${dbMode === 'plain' ? 'Plain PostgreSQL' : 'Supabase PostgreSQL'}`}>
-          {dbMode === 'plain' ? '🔵 Plain PG' : '🟢 Supabase'}
+        <span className="db-mode-badge plain" title="Database: Amazon Aurora Serverless">
+          🟠 Aurora
         </span>
         <div className="timer-badge">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

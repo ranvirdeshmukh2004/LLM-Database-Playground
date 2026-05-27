@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from './context/AuthContext';
 import { authFetch } from './api/client';
-import AuthPage from './pages/AuthPage';
 import ChatPage from './pages/ChatPage';
 import KeysPage from './pages/KeysPage';
 import AgentsPage from './pages/AgentsPage';
@@ -10,7 +8,6 @@ import TopBar from './components/TopBar';
 import Toast from './components/Toast';
 
 export default function App() {
-  const { isAuthenticated } = useAuth();
   const [view, setView] = useState('chat');
   const [providers, setProviders] = useState([]);
   const [selectedProvider, setSelectedProvider] = useState('');
@@ -53,13 +50,11 @@ export default function App() {
     } catch { /* ignore */ }
   }, []);
 
-  // Load on auth
+  // Initial load
   useEffect(() => {
-    if (isAuthenticated) {
-      loadProviders();
-      loadSessions();
-    }
-  }, [isAuthenticated, loadProviders, loadSessions]);
+    loadProviders();
+    loadSessions();
+  }, [loadProviders, loadSessions]);
 
   // ── Handlers ────────────────────────────────────────────
   const handleNewChat = () => {
@@ -89,8 +84,6 @@ export default function App() {
     setSelectedProvider(providerId);
     setSelectedModel('');
   };
-
-  if (!isAuthenticated) return <AuthPage />;
 
   return (
     <>

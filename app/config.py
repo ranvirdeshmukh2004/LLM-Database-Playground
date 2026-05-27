@@ -20,45 +20,18 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # ── Database Mode Toggle ────────────────────────────────
-    # 'supabase' = Full Supabase stack (GoTrue, Kong, RLS)
-    # 'plain'    = Plain PostgreSQL + app-managed auth
-    db_mode: str = "supabase"
-
-    @property
-    def is_plain_mode(self) -> bool:
-        return self.db_mode.lower() == "plain"
-
-    @property
-    def is_supabase_mode(self) -> bool:
-        return self.db_mode.lower() != "plain"
-
-    # ── PostgreSQL ───────────────────────────────────────────
-    postgres_host: str = "supabase-db"
-    postgres_port: int = 5432
-    postgres_db: str = "postgres"
-    postgres_user: str = "postgres"
-    postgres_password: str = ""
-
-    @property
-    def database_url(self) -> str:
-        return (
-            f"postgresql://{self.postgres_user}:{self.postgres_password}"
-            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
-        )
+    # ── Database ─────────────────────────────────────────────
+    aurora_url: str = ""
 
     @property
     def async_database_url(self) -> str:
-        return (
-            f"postgresql://{self.postgres_user}:{self.postgres_password}"
-            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
-        )
+        if not self.aurora_url:
+            raise ValueError("AURORA_URL environment variable is not set")
+        return self.aurora_url
 
-    # ── Supabase / JWT ───────────────────────────────────────
-    jwt_secret: str = ""
-    anon_key: str = ""
-    service_role_key: str = ""
-    supabase_url: str = "http://supabase-kong:8000"
+    @property
+    def database_url(self) -> str:
+        return self.async_database_url
 
     # ── App Secrets ──────────────────────────────────────────
     encryption_key: str = ""
@@ -79,11 +52,6 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
-
-    @property
-    def effective_db_host(self) -> str:
-        """Return the correct DB host based on mode."""
-        return self.postgres_host
 
 
 @lru_cache()
